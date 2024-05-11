@@ -1,0 +1,266 @@
+---
+title: "HSCT Computer Science Capstone Example"
+author: "Ocansey - Garces- Cordero - Cruz"
+date: "2024-05-11"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+library(httr2)
+library(tidyverse)
+library(jsonlite)
+library(tidyr)
+library(knitr)
+library(kableExtra)
+library(tidytext)
+library(psych)
+library(viridis)
+library(wordcloud2)
+library(ggraph)
+library(igraph)
+library(gapminder)
+library(gganimate)
+library(gifski)
+
+
+
+```
+
+# Segment 1 : Structure
+
+## Introduction
+
+We're a bunch of students who enjoy sharing our thoughts and interests. Many of us are into arts and design, but lately, we've all been intrigued by the field of artificial intelligence, particularly generative AI. It's because we see how important AI is becoming in today's world. This new interest has got everyone in our group excited and curious to learn more.
+
+## Story
+
+In our classes, our teachers always highlighted how vital it is to use AI wisely to enhance our learning. However, despite these reminders, there was no effective way to prevent some students from overly relying on AI tools. This became a significant issue when essays began circulating, copied and pasted without proper credit. It raised concerns about academic integrity and the value of original work. While AI offers incredible potential to aid our studies, it also presents challenges in maintaining honesty and creativity. As a group, we discussed the importance of finding a balance between leveraging AI for its benefits while also respecting the principles of academic integrity. This dilemma sparked thoughtful discussions among us, prompting us to explore ways to use AI responsibly and ethically in our academic pursuits.
+
+
+## Proposed Solution
+
+After conducting thorough research, it's evident that AI is essentially a trained model designed to assist with writing tasks. One approach we've discovered for essays, in particular, is to reverse-engineer it. This involves training a model to identify discrepancies or inconsistencies in writing, which can help maintain integrity and originality in academic work. By teaching AI to recognize patterns indicative of plagiarism or improper citation, we can leverage its capabilities to uphold academic standards and ensure that essays are the result of genuine effort and thought. This process requires careful consideration and experimentation to develop effective detection methods while also acknowledging the potential limitations and challenges associated with training such models. Nonetheless, this approach holds promise in addressing concerns related to academic integrity in an increasingly AI-driven educational landscape.
+
+## How
+
+Kaggle offers a dataset containing 10,000 essays. To address this as a binary classification problem—determining if an essay is AI-generated—we can employ a logistic regression model. This model utilizes a specific threshold to map essays based on their words and determine if they're likely AI-generated or not. By analyzing the characteristics and patterns within the essays, the model can make predictions regarding their origin. However, it's crucial to preprocess the data effectively, considering factors like feature selection, normalization, and handling of outliers, to ensure the model's accuracy and reliability. Additionally, model evaluation techniques such as cross-validation and performance metrics like precision, recall, and F1 score can help assess its effectiveness in distinguishing between AI-generated and human-written essays. Through iterative refinement and validation, we can optimize the logistic regression model to provide reliable insights into the origins of the essays in the dataset.
+
+# Section 2 : User Interface 
+## User Interaction
+
+We have to provide a way for users to use this platform therefor we will build a website using front end scripting languages such as  HTML and CSS along with multifacceted languagse javascript in order to query from the model.
+
+- Sample : 
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Essay Classifier</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>AI Essay Classifier</h1>
+    </header>
+    <main>
+        <textarea id="essayInput" placeholder="Paste your essay here..."></textarea>
+        <button onclick="classifyEssay()">Classify</button>
+        <p id="result"></p>
+    </main>
+    <script src="script.js"></script>
+</body>
+</html>
+
+## Website Description 
+
+- Colors - Yellow, Green, Black
+- Categories - Welcome page, About us, Published Proposal(Visualizations), Tool usage page
+- Values - Integrity, Honesty, Growth
+- Mission Statement(compacted) - To provide tools that allows for integrity in the education setting.
+- Vision - To allow education to be as effective as it has always been.
+
+# Section 3 : EDA (Exploratory Data Analysis)
+
+## Load Data
+```{r }
+
+  url <- "https://raw.githubusercontent.com/jamilton08/HSCT-CAPSTONE-REPO/main/Computer%20Science/Samples/Capstone/10k_chatgpt_essays.json"
+df <- fromJSON(url) 
+df <- as.data.frame(df)
+## List is wide to will make longer
+
+  kbl(df[1, 1 : 5]) |>
+ kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+```
+
+## Clean Data 
+
+```{r}
+df <- df |> 
+   pivot_longer(
+    cols = starts_with("full_text"), 
+    names_to = "id", 
+    values_to = "essay"
+  ) |>
+  select(id, essay) |>
+  mutate(id = str_extract(id, "\\d+"))
+
+ kbl(df[1:2,]) |>
+ kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+
+```
+
+## Average Word Per Essay
+
+Although right skewed we get a sense of normality
+
+```{r Relevant To Project}
+df <- df |>
+  mutate(count = str_count(essay, "\\w+ ")) 
+
+  ggplot( df, aes(x = count)) +
+  geom_histogram( fill = "skyblue", color = "black") +
+  labs(title = " Word Frequency of ChatGPT Essays", x = "Word", y = "Frequency") + 
+  theme_bw()
+```
+
+
+
+## Summarry Statistic 
+ We can derive that 68% of essays are between 150 words to 570 (Estimates)
+
+```{r}
+describe(df$count)
+```
+
+## Word Cloud Dataset
+
+we will tokenize words in order to recieve their frequencies
+
+```{r echo=TRUE}
+ words <- df |>
+         unnest_tokens(word, essay) |> ## Tokenize
+         mutate(word = str_remove_all(word, "_|-|\\.")) |> ## remove all wierd words
+         anti_join(stop_words) |> ## remove common words like and, or and etc
+         count(word, , name = "freq")  |>
+         filter(!str_detect(word, "\\d+")) |>
+         filter(freq > 3)
+
+kbl(words[11:15,]) |>
+ kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+
+```
+
+## Word Cloud Visual
+
+Here we see the most common words used in ChatGPT essays
+
+```{r}
+
+words <- words[order(-words$freq),]
+wordcloud2(words[1 : 150, ], color = "random-light", backgroundColor = "red")
+
+```
+
+
+
+## Relationship between Consecutive Words
+
+```{r}
+essay_bigrams <- df|>
+                unnest_tokens(
+                  bigram,
+                  essay,
+                  token = "ngrams",
+                  n=2
+                  )
+
+essay_bigrams[1:5,] |>
+          kbl() |>
+          kable_material_dark("hover")
+```
+
+## Relationship Frequency 
+
+```{r}
+essay_bigrams_count <- essay_bigrams |>
+                      count(bigram, sort = TRUE)
+essay_bigrams_count[1:5,] |>
+          kbl() |>
+          kable_material_dark("hover")
+                      
+```
+
+
+## NGram Rel
+
+We see here how relationships are mapped and we get to study the tedency of ChatGPT is language
+
+```{r}
+essay_bigrams_graph <- essay_bigrams_count |>
+                      filter(n > 2000) |>
+                      graph_from_data_frame()
+custom_arrow <- grid::arrow(type = "closed", length = unit(.16, "inches"))
+
+ggraph(essay_bigrams_graph, layout = "fr") + 
+  geom_edge_link(
+    show.legend = FALSE,
+    arrow = custom_arrow,
+    end_cap = circle(0.5, "inches")) + 
+  geom_node_point(color = "sienna1", size = 4) + 
+  geom_node_text(aes(label = name),  size = 2) + 
+  theme_void()
+```
+
+
+
+
+# Segment 4 : Implementation
+
+## Complication
+
+
+Understanding the intricacies of human language is vital for training machine learning models to discern between machine-generated and human-authored text. Just as we've delved into ChatGPT's language patterns, studying essays penned by students can provide invaluable insights into human writing styles. By curating a diverse corpus of student essays across various grade levels, subjects, and writing abilities, we can capture the nuanced characteristics inherent in human-written text.
+
+These essays serve as a rich dataset for training models, allowing them to learn the subtle nuances of human expression, including vocabulary choices, sentence structures, and coherence. Incorporating features such as grammatical errors, colloquialisms, and personal anecdotes further enriches the dataset, enabling models to distinguish between machine-generated and human-written content with greater accuracy.
+
+Utilizing logistic regression or other machine learning techniques, we can leverage this dataset to develop robust classifiers capable of differentiating between machine and human-authored text. By iteratively refining the model's performance against labeled data, we can enhance its ability to accurately identify the origin of text, facilitating applications such as content moderation, plagiarism detection, and quality assessment in educational settings.
+
+In essence, by analyzing the natural language of student essays, we can equip machine learning models with the discernment necessary to differentiate between machine-generated and human-authored text, contributing to the advancement of text classification technology and its diverse applications.
+
+
+## Model 
+
+Although just a visual, we see letters being dislayed as years go by and we tend to use such model to locate a mapped word relationship within the year it was trending in order classify it between the context of time and language
+
+```{r}
+ggplot(gapminder, aes(gdpPercap, lifeExp, size = pop, color = continent)) +
+  geom_point() +
+  scale_x_log10() +
+  theme_bw() +
+  labs(title = 'Year: {frame_time}', x = 'words freq', y = 'language transient') +
+  transition_time(year) +
+  ease_aes('linear')
+
+```
+
+# Segment 5 : Conclude
+
+## Conclusion
+
+In conclusion, the issue of academic integrity looms large in an age where the internet offers boundless opportunities for students to access and potentially misuse AI-generated content. While complete control over online resources may remain elusive, there are proactive measures we can take to mitigate the abuse of AI in academic settings.
+
+One such strategy is to develop robust systems capable of identifying machine-generated essays. By securing funding to gather a substantial dataset of human-written essays across diverse subjects and grade levels, we can train machine learning models to discern between human and AI-generated text effectively. These models, when integrated into educational platforms and assessment tools, can serve as a deterrent to academic dishonesty, empowering educators to uphold standards of integrity and authenticity in student work.
+
+While this approach may not eradicate the problem entirely, it offers a significant step towards preserving academic integrity and fostering a culture of honesty and originality in academic pursuits. Moreover, by raising awareness about the implications of AI misuse and promoting ethical writing practices, we can cultivate a community committed to upholding the principles of intellectual integrity and responsible scholarship.
+
+In essence, by investing in the development of AI detection mechanisms and promoting ethical behavior, we can confront the challenges posed by AI-generated content and safeguard the integrity of academic discourse. Through collaboration between educators, researchers, and technology developers, we can work towards creating a more transparent and trustworthy academic environment for current and future generations.
+
+## Resources
+
+- Dataset - https://www.kaggle.com/datasets/kevinbnisch/10k-synthetic-persuade-essays-aes?resource=download
+- Raw Dataset - https://raw.githubusercontent.com/jamilton08/HSCT-CAPSTONE-REPO/main/Computer%20Science/Samples/Capstone/10k_chatgpt_essays.json
+- AI Misdirection - https://www.commonsense.org/education/articles/chatgpt-and-beyond-how-to-handle-ai-in-schools
+
